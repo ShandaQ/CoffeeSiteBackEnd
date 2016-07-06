@@ -1,6 +1,7 @@
 var express = require('express');
 var app = express();
 var session = require('express-session');
+
 //middleware
 var bodyParser = require('body-parser');
 var bcrypt = require('bcrypt');
@@ -11,6 +12,10 @@ var randToken = require('rand-token');
 var mongoose = require('mongoose');
 var User = require('./user');
 
+// middleware
+// register the application with the middleware
+// parsers the json formated body data
+// save the requests in req.body, as a javascript
 app.use(bodyParser.json());
 
 mongoose.connect('mongodb://localhost/users');
@@ -207,10 +212,9 @@ app.get('/orders', authRequired, function(req, res){
 });
 
 
-
+// middleware
 function authRequired(req, res, next){
   var token = req.query.token || req.body.token;
-
 
   if(!token){
     res.json({
@@ -221,7 +225,7 @@ function authRequired(req, res, next){
   }
 
   User.findOne({authenticationTokens: token}, function(err, user){
-    console.log(user);
+    //console.log(user);
     // set req.user to user so that it can be used in the app.get and .post call
     req.user = user;
     if(err){
