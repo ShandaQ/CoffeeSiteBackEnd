@@ -90,18 +90,18 @@ app.post('/login', function(req, res){
     if(!user){
       res.json({
         status: "fail",
-        message: "Invalid username"
+        message: "Invalid username or password"
       });
       return;
     }
 
 // if the user name exist check to see if they enter the correct password
     bcrypt.compare(credentials.password, user.password, function(err, match){
-      if(err){
+      if(err || !match){
         console.error(err.message);
         res.json({
           status: 'fail',
-          message: 'database connectivity error'
+          message: "Invalid username or password"
         });
         return;
       }
@@ -146,20 +146,27 @@ app.post('/login', function(req, res){
   }); // end User.findOne
 }); // end app.post - login
 
-app.post('/orders', function(req, res){
-  var tokenKey = req.body.token;
+app.post('/orders', authRequired, function(req, res){
+  // var tokenKey = req.body.token;
   var newOrder = req.body;
 
-  User.findOne({authenticationTokens: tokenKey}, function(err, user){
-    if(err){
-      console.error(err.message);
-      res.json({
-        status: 'fail',
-        message: 'database connectivity error'
-      });
-      return;
-    }
-    if(user){
+  // User.findOne({authenticationTokens: tokenKey}, function(err, user){
+  //   if(err){
+  //     console.error(err.message);
+  //     res.json({
+  //       status: 'fail',
+  //       message: 'database connectivity error'
+  //     });
+  //     return;
+  //   }
+  //   if(!user){
+  //     res.json({
+  //       status: 'fail',
+  //       message: 'User is not authorized'
+  //     });
+  //     return;
+  //   }
+  //   if(user){
       User.update(
         // {authenticationTokens: tokenKey},
         {$push:
@@ -176,15 +183,47 @@ app.post('/orders', function(req, res){
           res.send('ok');
         } // end callback function
       ); //end User.update
-    }
-  });
+  //   }
+  // });
 });
 
-app.get('/orders', function(req, res){
+
+app.get('/orders', authRequired, function(req, res){
   // get/orders?token="something"
-  var token = req.query.token;
+
+  // var token = req.query.token;
+
+  // User.findOne({authenticationTokens: token}, function(err, user){
+  //   if(err){
+  //     console.error(err.message);
+  //     res.json({
+  //       status: 'fail',
+  //       message: 'database connectivity error'
+  //     });
+  //     return;
+  //   }
+     res.send(req.user.orders);
+  // });
+});
+
+
+
+function authRequired(req, res, next){
+  var token = req.query.token || req.body.token;
+
+
+  if(!token){
+    res.json({
+      status: 'failed',
+      message: 'please login'
+    });
+    return;
+  }
 
   User.findOne({authenticationTokens: token}, function(err, user){
+    console.log(user);
+    // set req.user to user so that it can be used in the app.get and .post call
+    req.user = user;
     if(err){
       console.error(err.message);
       res.json({
@@ -193,10 +232,14 @@ app.get('/orders', function(req, res){
       });
       return;
     }
-
-    res.send(user.orders);
+    if(user) {
+      next();
+    } else {
+      res.json({message: 'please login'});
+    }
   });
-});
+}
+
 
 app.listen(8000, function(){
   console.log("Listening on port 8000");
