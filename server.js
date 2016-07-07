@@ -1,4 +1,8 @@
 var express = require('express');
+
+// allows a web app in a different domain to access this api
+var cors = require('cors');
+
 var app = express();
 var session = require('express-session');
 
@@ -11,6 +15,9 @@ var randToken = require('rand-token');
 
 var mongoose = require('mongoose');
 var User = require('./user');
+
+// allows a web app in a different domain to access this api
+app.use(cors());
 
 // middleware
 // register the application with the middleware
