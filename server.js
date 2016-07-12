@@ -16,6 +16,9 @@ var randToken = require('rand-token');
 var mongoose = require('mongoose');
 var User = require('./user');
 
+// need to charge user credit card for order
+var stripe = require("stripe")("sk_test_YDRmKlCdVAFP4dj3KiV8nJXE");
+
 // allows a web app in a different domain to access this api
 app.use(cors());
 
@@ -26,7 +29,6 @@ app.use(cors());
 app.use(bodyParser.json());
 
 mongoose.connect('mongodb://localhost/users');
-
 
 app.get('/options', function(req, res){
   res.json({
@@ -60,9 +62,10 @@ app.post('/signup', function(req, res) {
     }else{
       // save username and pswd to the database
       //bcrypt user password
+      console.log("credentials", credentials);
       bcrypt.hash(credentials.password, 10, function(err, encryptedPassword) {
         if (err) {
-          console.error(err.message);
+          console.error("bcrypr hash error" ,err.message);
           return;
         }
         console.log('Password:', credentials.password);
@@ -100,6 +103,7 @@ app.post('/login', function(req, res){
 
     // checking to see if user gets found
     if(!user){
+      res.status(409);
       res.json({
         status: "fail",
         message: "Invalid username or password"
@@ -111,6 +115,7 @@ app.post('/login', function(req, res){
     bcrypt.compare(credentials.password, user.password, function(err, match){
       if(err || !match){
         console.error(err.message);
+        res.status(409);
         res.json({
           status: 'fail',
           message: "Invalid username or password"
@@ -119,11 +124,12 @@ app.post('/login', function(req, res){
       }
 
 // if username and password are correct update the user and push a session token to the database
+      var token = randToken.generate(64);
       if(match){
         User.update(
           {_id: credentials.username},
           {$push:
-            {authenticationTokens: randToken.generate(64)}
+            {authenticationTokens: token}
           },function(err, status){
             if(err){
               console.error(err.message);
@@ -132,18 +138,13 @@ app.post('/login', function(req, res){
                 message: 'database connectivity error'
               });
               return;
-            }else {
-              res.json({
-                status: 'status',
-                message: 'database connected'
-              });
-              return;
             }
           }
         );
         res.json({
           status: 'success',
-          message:'update completed'
+          message:'update completed',
+          token: token
         });
         return;
       }else {
@@ -162,41 +163,22 @@ app.post('/orders', authRequired, function(req, res){
   // var tokenKey = req.body.token;
   var newOrder = req.body;
 
-  // User.findOne({authenticationTokens: tokenKey}, function(err, user){
-  //   if(err){
-  //     console.error(err.message);
-  //     res.json({
-  //       status: 'fail',
-  //       message: 'database connectivity error'
-  //     });
-  //     return;
-  //   }
-  //   if(!user){
-  //     res.json({
-  //       status: 'fail',
-  //       message: 'User is not authorized'
-  //     });
-  //     return;
-  //   }
-  //   if(user){
-      User.update(
-        // {authenticationTokens: tokenKey},
-        {$push:
-          {orders: req.body.orders}
-        },function(err, status){
-          if(err){
-            res.send({
-              status: 'fail',
-              message:'missing required fields'
-            });
-            return;
-          }
-          console.log("status",status);
-          res.send('ok');
-        } // end callback function
-      ); //end User.update
-  //   }
-  // });
+  User.update(
+    // {authenticationTokens: tokenKey},
+    {$push:
+      {orders: req.body.orders}
+    },function(err, status){
+      if(err){
+        res.send({
+          status: 'fail',
+          message:'missing required fields'
+        });
+        return;
+      }
+      console.log("status",status);
+      res.send('ok');
+    } // end callback function
+  ); //end User.update
 });
 
 
@@ -218,6 +200,34 @@ app.get('/orders', authRequired, function(req, res){
   // });
 });
 
+// handler for the credit card charge
+// stripe token, amount
+app.post('/charge', function(req, res){
+  var amount = req.body.total;
+  var token = req.body.token;
+
+  // makes the chrge using the credit card - with the matching token
+  // https://stripe.com/docs/api/node#create_charge
+  stripe.charges.create({
+    amount: amount,
+    currency: "usd",
+    source: token,
+    description: "Charges for coffee"
+  },function(err, charge){
+    if(err){
+      res.status(409);
+      res.json({
+        status:'fail',
+        error: err.message
+      });
+      return;
+    }
+    res.json({
+      status: 'ok',
+      charge: charge
+    });
+  });
+});
 
 // middleware
 function authRequired(req, res, next){
@@ -250,7 +260,6 @@ function authRequired(req, res, next){
     }
   });
 }
-
 
 app.listen(8000, function(){
   console.log("Listening on port 8000");
