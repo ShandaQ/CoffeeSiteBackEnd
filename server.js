@@ -8,12 +8,18 @@ var session = require('express-session');
 
 //middleware
 var bodyParser = require('body-parser');
-var bcrypt = require('bcrypt');
+var bcrypt = require('my-bcrypt');
+// var bcrypt = require('bcrypt');
 
 var randToken = require('rand-token');
 // var token = randToken.generate(64);
 
 var mongoose = require('mongoose');
+
+// mongoLab
+var mongoCreds = require('./mongo_creds.json');
+
+mongoose.connect('mongodb://' + mongoCreds.username + ':' + mongoCreds.password + '@ds031915.mlab.com:31915/sqk_coffee_site');
 var User = require('./user');
 
 // need to charge user credit card for order
@@ -28,7 +34,7 @@ app.use(cors());
 // save the requests in req.body, as a javascript
 app.use(bodyParser.json());
 
-mongoose.connect('mongodb://localhost/users');
+// mongoose.connect('mongodb://localhost/users');
 
 app.get('/options', function(req, res){
   res.json({
